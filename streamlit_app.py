@@ -18,7 +18,6 @@ st.subheader('Raw Data')
 st.write(data)
 
 # Data Filtered
-
 season_filter_enabled = st.sidebar.checkbox('Filter by Season', value=True)
 weather_filter_enabled = st.sidebar.checkbox('Filter by Weather', value=True)
 date_filter_enabled = st.sidebar.checkbox('Filter by Date', value=True)
@@ -34,8 +33,8 @@ if(weather_filter_enabled):
     filtered_data = filtered_data[filtered_data['weathersit'] == weather_list[weather_filter]]
 
 if(date_filter_enabled):
-    start_date = st.sidebar.date_input(label='Start date', min_value=datetime.date(2011, 1, 1), max_value=datetime.date(2012, 12, 30))
-    end_date = st.sidebar.date_input(label='End date', min_value=datetime.date(2011, 1, 2), max_value=datetime.date(2012, 12, 31))
+    start_date = st.sidebar.date_input(label='Start date', min_value=pd.to_datetime(data['dteday'].min()), max_value=pd.to_datetime(data['dteday'].max()), value=pd.to_datetime(data['dteday'].min()))
+    end_date = st.sidebar.date_input(label='End date', min_value=pd.to_datetime(data['dteday'].min()), max_value=pd.to_datetime(data['dteday'].max()), value=pd.to_datetime(data['dteday'].max()))
     filtered_data = filtered_data[
     (pd.to_datetime(filtered_data['dteday']) >= pd.to_datetime(start_date)) & 
     (pd.to_datetime(filtered_data['dteday']) <= pd.to_datetime(end_date))
@@ -44,6 +43,7 @@ if(date_filter_enabled):
 st.subheader(f'Filtered Data')
 st.write(filtered_data)
 
+# data visualization
 st.subheader('Bike Rentals vs Temperature')
 plt.figure(figsize=(8, 6))
 sns.regplot(x='temp', y='cnt', data=filtered_data, line_kws={"color":"red"})
