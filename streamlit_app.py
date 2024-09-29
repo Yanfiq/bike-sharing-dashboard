@@ -1,151 +1,69 @@
+import datetime
 import streamlit as st
 import pandas as pd
-import math
-from pathlib import Path
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-# Set the title and favicon that appear in the Browser's tab bar.
-st.set_page_config(
-    page_title='GDP dashboard',
-    page_icon=':earth_americas:', # This is an emoji shortcode. Could be a URL too.
-)
+st.title("Bike Sharing Data Analysis")
 
-# -----------------------------------------------------------------------------
-# Declare some useful functions.
+season_list = {"Spring": 1, "Summer": 2, "Fall": 3, "Winter": 4}
+weather_list = {"Clear, Few clouds, Partly cloudy, Partly cloudy": 1,
+		        "Mist + Cloudy, Mist + Broken clouds, Mist + Few clouds, Mist": 2,
+		        "Light Snow, Light Rain + Thunderstorm + Scattered clouds, Light Rain + Scattered clouds": 3,
+		        "Heavy Rain + Ice Pallets + Thunderstorm + Mist, Snow + Fog": 4}
 
-@st.cache_data
-def get_gdp_data():
-    """Grab GDP data from a CSV file.
+# Raw data
+data = pd.read_csv('day.csv')
+st.subheader('Raw Data')
+st.write(data)
 
-    This uses caching to avoid having to read the file every time. If we were
-    reading from an HTTP endpoint instead of a file, it's a good idea to set
-    a maximum age to the cache with the TTL argument: @st.cache_data(ttl='1d')
-    """
+# Data Filtered
 
-    # Instead of a CSV on disk, you could read from an HTTP endpoint here too.
-    DATA_FILENAME = Path(__file__).parent/'data/gdp_data.csv'
-    raw_gdp_df = pd.read_csv(DATA_FILENAME)
+season_filter_enabled = st.sidebar.checkbox('Filter by Season', value=True)
+weather_filter_enabled = st.sidebar.checkbox('Filter by Weather', value=True)
+date_filter_enabled = st.sidebar.checkbox('Filter by Date', value=True)
 
-    MIN_YEAR = 1960
-    MAX_YEAR = 2022
+filtered_data = data
 
-    # The data above has columns like:
-    # - Country Name
-    # - Country Code
-    # - [Stuff I don't care about]
-    # - GDP for 1960
-    # - GDP for 1961
-    # - GDP for 1962
-    # - ...
-    # - GDP for 2022
-    #
-    # ...but I want this instead:
-    # - Country Name
-    # - Country Code
-    # - Year
-    # - GDP
-    #
-    # So let's pivot all those year-columns into two: Year and GDP
-    gdp_df = raw_gdp_df.melt(
-        ['Country Code'],
-        [str(x) for x in range(MIN_YEAR, MAX_YEAR + 1)],
-        'Year',
-        'GDP',
-    )
+if(season_filter_enabled):
+    season_filter = st.sidebar.selectbox("Select Season", options=list(season_list.keys()), index=0)
+    filtered_data = filtered_data[filtered_data['season'] == season_list[season_filter]]
 
-    # Convert years from string to integers
-    gdp_df['Year'] = pd.to_numeric(gdp_df['Year'])
+if(weather_filter_enabled):
+    weather_filter = st.sidebar.selectbox("Select Weather", options=list(weather_list.keys()), index=0)
+    filtered_data = filtered_data[filtered_data['weathersit'] == weather_list[weather_filter]]
 
-    return gdp_df
+if(date_filter_enabled):
+    start_date = st.sidebar.date_input(label='Start date', min_value=datetime.date(2011, 1, 1), max_value=datetime.date(2012, 12, 30))
+    end_date = st.sidebar.date_input(label='End date', min_value=datetime.date(2011, 1, 2), max_value=datetime.date(2012, 12, 31))
+    filtered_data = filtered_data[
+    (pd.to_datetime(filtered_data['dteday']) >= pd.to_datetime(start_date)) & 
+    (pd.to_datetime(filtered_data['dteday']) <= pd.to_datetime(end_date))
+    ]
 
-gdp_df = get_gdp_data()
+st.subheader(f'Filtered Data')
+st.write(filtered_data)
 
-# -----------------------------------------------------------------------------
-# Draw the actual page
+# Plot a simple graph (e.g., bike rentals vs temperature)
+st.subheader('Bike Rentals vs Temperature')
+plt.figure(figsize=(8, 6))
+sns.regplot(x='temp', y='cnt', data=filtered_data, line_kws={"color":"red"})
+st.pyplot(plt)
 
-# Set the title that appears at the top of the page.
-'''
-# :earth_americas: GDP dashboard
+st.subheader('Bike Rentals vs Feeling Temperature')
+plt.figure(figsize=(8, 6))
+sns.regplot(x='atemp', y='cnt', data=filtered_data, line_kws={"color":"red"})
+st.pyplot(plt)
 
-Browse GDP data from the [World Bank Open Data](https://data.worldbank.org/) website. As you'll
-notice, the data only goes to 2022 right now, and datapoints for certain years are often missing.
-But it's otherwise a great (and did I mention _free_?) source of data.
-'''
-
-# Add some spacing
-''
-''
-
-min_value = gdp_df['Year'].min()
-max_value = gdp_df['Year'].max()
-
-from_year, to_year = st.slider(
-    'Which years are you interested in?',
-    min_value=min_value,
-    max_value=max_value,
-    value=[min_value, max_value])
-
-countries = gdp_df['Country Code'].unique()
-
-if not len(countries):
-    st.warning("Select at least one country")
-
-selected_countries = st.multiselect(
-    'Which countries would you like to view?',
-    countries,
-    ['DEU', 'FRA', 'GBR', 'BRA', 'MEX', 'JPN'])
-
-''
-''
-''
-
-# Filter the data
-filtered_gdp_df = gdp_df[
-    (gdp_df['Country Code'].isin(selected_countries))
-    & (gdp_df['Year'] <= to_year)
-    & (from_year <= gdp_df['Year'])
-]
-
-st.header('GDP over time', divider='gray')
-
-''
-
-st.line_chart(
-    filtered_gdp_df,
-    x='Year',
-    y='GDP',
-    color='Country Code',
-)
-
-''
-''
+st.subheader('Bike Rentals vs Humidity')
+plt.figure(figsize=(8, 6))
+sns.regplot(x='hum', y='cnt', data=filtered_data, line_kws={"color":"red"})
+st.pyplot(plt)
 
 
-first_year = gdp_df[gdp_df['Year'] == from_year]
-last_year = gdp_df[gdp_df['Year'] == to_year]
-
-st.header(f'GDP in {to_year}', divider='gray')
-
-''
-
-cols = st.columns(4)
-
-for i, country in enumerate(selected_countries):
-    col = cols[i % len(cols)]
-
-    with col:
-        first_gdp = first_year[first_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-        last_gdp = last_year[last_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-
-        if math.isnan(first_gdp):
-            growth = 'n/a'
-            delta_color = 'off'
-        else:
-            growth = f'{last_gdp / first_gdp:,.2f}x'
-            delta_color = 'normal'
-
-        st.metric(
-            label=f'{country} GDP',
-            value=f'{last_gdp:,.0f}B',
-            delta=growth,
-            delta_color=delta_color
-        )
+# Plot bike rentals for the selected season
+st.subheader(f'Bike Rentals')
+plt.figure(figsize=(20, 10))
+plt.xticks(rotation=90)
+sns.lineplot(x='dteday', y='cnt', data=filtered_data)
+st.pyplot(plt)
